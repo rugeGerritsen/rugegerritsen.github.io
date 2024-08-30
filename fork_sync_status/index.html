@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles/styles.css">
+    <title>Repo fork status</title>
+</head>
+
+<script src="js/script.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+
+<body onload="onPageLoad()">
+
+    <h1>Repo sync status</h1>
+
+    <p>
+        This webpage displays the synchronization status of a downstream repo.
+    </p>
+
+    <fieldset>
+        <legend>Select data source:</legend>
+        <form>
+            <input type="radio" id="option_server_data" name="radio_data_src" checked="checked">
+            <label for="option_server_data">Use latest data populated by github action</label><br>
+            <input type="radio" id="option_upload" name="radio_data_src">
+            <label for="option_upload">Upload local commit data</label><br>
+        </form>
+    </fieldset>
+
+    <p>The following configuration is being used:</p>
+
+    <table id="tbl_data_config"></table>
+
+    <h2>Commit details</h2>
+
+    <p>
+        The tabs below show the different lists of commits.
+        The commits can be filtered by specifying a regex.
+        Limitation: The implementation is currently only filtering based upon the last updated filter.
+    </p>
+
+
+    <!-- Tab links -->
+    <div class="tab">
+        <button class="tablinks" onclick="openTab(event, 'DownstreamOnly')" id="defaultOpen">Downstream only</button>
+        <button class="tablinks" onclick="openTab(event, 'UpstreamOnly')">Upstream only</button>
+        <button class="tablinks" onclick="openTab(event, 'CherryPicked')">Cherry-picked from upstream</button>
+        <button class="tablinks" onclick="openTab(event, 'UpstreamPr')">Cherry-picked from upstream PR</button>
+    </div>
+
+    <!-- Tab content -->
+    <div id="DownstreamOnly" class="tabcontent">
+        Commits that are only present in the fork should only represent 'noup', 'fromlist', and 'revert' commits.
+        <br><br>
+        <table id="tbl_commits_only_downstream"></table>
+    </div>
+
+    <div id="UpstreamOnly" class="tabcontent">
+        Commits that have not yet been added to the fork.
+        <br><br>
+        <table id="tbl_commits_not_downstream"></table>
+    </div>
+
+    <div id="CherryPicked" class="tabcontent">
+        Commits that have been cherry-picked from the upstream repo.
+        <br><br>
+        <table id="tbl_commits_fromtree"></table>
+    </div>
+
+    <div id="UpstreamPr" class="tabcontent">
+        Commits that have been cherry-picked from upstream before they were merged to upstream.
+        <br><br>
+        <table id="tbl_commits_fromlist"></table>
+    </div>
+
+</body>
+
+
+</html>
