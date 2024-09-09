@@ -29,11 +29,14 @@ class CommitRepr:
     def __init__(self,
                  commit: git.Commit,
                  parse_message_for_upstream_info=False,
-                 downstream_sha = None):
+                 downstream_sha = None,
+                 downstream_sha_guess = None):
         self._commit = commit
         self._upstream_sha = None
         self._upstream_pr = None
         self._downstream_sha = downstream_sha
+        self._downstream_sha_guess = downstream_sha_guess
+        self._upstream_sha_guess = downstream_sha_guess
 
         if parse_message_for_upstream_info:
             self._set_upstream_pr_or_sha()
@@ -58,6 +61,28 @@ class CommitRepr:
         """Returns the downstream SHA"""
         return self._downstream_sha
 
+    @property
+    def downstream_sha_guess(self) -> str:
+        """Returns the downstream SHA for a commit that was
+        cherry-picked from the PR before it was merged.
+        
+        Note: It is not necessarily true that those two commits match.
+        """
+        return self._downstream_sha_guess
+
+    @property
+    def upstream_sha_guess(self):
+        """A guess of the corresponding upstream SHA based
+        up on info that said that a commit was picked from a PR.
+        """
+        return self._upstream_sha_guess
+
+    @upstream_sha_guess.setter
+    def upstream_sha_guess(self, sha):
+        """Sets the guess
+        """
+        self._upstream_sha_guess = sha
+
     def to_dict(self) -> dict:
         """Convert commit to dictionary representation
 
@@ -68,7 +93,8 @@ class CommitRepr:
         """
         representation = {
                 'sha': str(self._commit),
-                'seconds_since_epoch': self._commit.authored_date,
+                'authored_seconds_since_epoch': self._commit.authored_date,
+                'committed_seconds_since_epoch': self._commit.committed_date,
                 'author': self._commit.author.name,
                 'title': self._commit.summary
             }
@@ -78,6 +104,10 @@ class CommitRepr:
             representation['upstream_sha'] = self._upstream_sha
         if self._downstream_sha:
             representation['downstream_sha'] = self._downstream_sha
+        if self._downstream_sha_guess:
+            representation['downstream_sha_guess'] = self._downstream_sha_guess
+        if self._upstream_sha_guess:
+            representation['upstream_sha_guess'] = self._upstream_sha_guess
 
         return representation
 
@@ -160,22 +190,45 @@ def get_fork_sync_data(upstream_commits: typing.Iterator[git.Commit],
     """
     data = {}
 
-    # Create a dictionary mapping downstream to upstream commits.
+    # Create dictionary mapping downstream to upstream commits.
     # This will be used when mapping upstream to downstream commits.
     upstream_commits_with_downstream = {}
+    downstream_commit_titles_with_possible_upstream = {}
+    temp_downstream_item_list = []
 
     data['downstream_commits'] = []
     for commit in downstream_commits:
         item = CommitRepr(commit, parse_message_for_upstream_info=True)
-        data['downstream_commits'].append(item.to_dict())
+        temp_downstream_item_list.append(item)
         if item.upstream_sha:
             upstream_commits_with_downstream[item.upstream_sha] = item.sha
+        elif item.upstream_pr:
+            if commit.summary.startswith('[nrf fromlist] '):
+                upstream_commit_title = commit.summary[len('[nrf fromlist] '):]
+            else:
+                upstream_commit_title = commit.summary
+
+            downstream_commit_titles_with_possible_upstream[upstream_commit_title] = item
 
     data['upstream_commits'] = []
     for commit in upstream_commits:
         downstream_sha = upstream_commits_with_downstream.get(str(commit), None)
-        item = CommitRepr(commit, downstream_sha=downstream_sha)
+
+        # Check if the commit is a fromlist commit that has been merged to upstream
+        downstream_sha_picked_from_pr = None
+        downstream_picked_from_pr = \
+            downstream_commit_titles_with_possible_upstream.get(commit.summary, None)
+        if downstream_picked_from_pr:
+            downstream_picked_from_pr.upstream_sha_guess = str(commit)
+            downstream_sha_picked_from_pr = downstream_picked_from_pr.sha
+
+        item = CommitRepr(commit,
+                          downstream_sha=downstream_sha,
+                          downstream_sha_guess=downstream_sha_picked_from_pr)
         data['upstream_commits'].append(item.to_dict())
+
+    for item in temp_downstream_item_list:
+        data['downstream_commits'].append(item.to_dict())
 
     return data
 
@@ -237,7 +290,7 @@ def main():
             'upstream_rev': args.upstream_rev,
             'downstream_url': args.downstream_url,
             'downstream_rev': args.downstream_rev,
-            'seconds_since_epoch': int(time.time()),
+            'authored_seconds_since_epoch': int(time.time()),
         },
         'merge_base': CommitRepr(merge_base).to_dict()
     }

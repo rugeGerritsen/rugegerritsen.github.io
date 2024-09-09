@@ -121,11 +121,11 @@ function updateTable(table, headerRow, template, commits) {
 
     commits.forEach(item => {
         row = table.insertRow()
-        Object.keys(template).forEach(entry => {
+        template.forEach(entry => {
             const cell = document.createElement("td");
-            const val = item[entry];
+            const val = entry(item);
             if (val) {
-                cell.innerHTML = template[entry](val);
+                cell.innerHTML = val;
             } else {
                 cell.innerText = "";
             }
@@ -145,9 +145,9 @@ function updateDataSourceTable(data) {
         { title: "Upstream revision", val: data.meta.upstream_rev },
         { title: "Downstream URL", val: data.meta.downstream_url },
         { title: "Downstream revision", val: data.meta.downstream_rev },
-        { title: "Data was obtained at", val: utcSecondsToDate(data.meta.seconds_since_epoch) },
+        { title: "Data was obtained at", val: utcSecondsToDate(data.meta.authored_seconds_since_epoch) },
         { title: "Last rebase/Merge base SHA", val: shaToLink(data.meta.downstream_url, data.merge_base.sha) },
-        { title: "Last rebase/Merge base timestamp", val: utcSecondsToDate(data.merge_base.seconds_since_epoch) },
+        { title: "Last rebase/Merge base timestamp", val: utcSecondsToDate(data.merge_base.authored_seconds_since_epoch) },
         { title: "Number of noup commits", val: countNoUpCommits(data) },
         { title: "Number of fromlist commits", val: countFromListCommits(data) },
         { title: "Number of fromtree commits", val: countFromTreeCommits(data) },
@@ -169,14 +169,31 @@ function updateDownstreamOnlyTable(data) {
     var table = document.getElementById('tbl_commits_only_downstream');
     table.innerHTML = "";
 
-    const headerRow = ['Title', 'SHA', 'Committed date', 'Upstream PR', 'Author'];
-    const template = {
-        title: (title) => title,
-        sha: (sha) => shaToLink(data.meta.downstream_url, sha),
-        seconds_since_epoch: (time) => utcSecondsToDate(time),
-        upstream_pr: (upstream_pr) => prToLink(upstream_pr),
-        author: (author) => author
-    };
+    const headerRow = [
+        'Title',
+        'SHA',
+        'Authored date',
+        'Committed date',
+        'Upstream PR / Guessed upstream SHA',
+        'Author'];
+    const template = [
+        (item) => item.title,
+        (item) => shaToLink(data.meta.downstream_url, item.sha),
+        (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
+        (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
+        (item) => {
+            const pr_link = item['upstream_pr'] ? prToLink(item.upstream_pr) : "";
+            const upstream_sha_guess = item['upstream_sha_guess'] ? shaToLink(data.meta.upstream_url, item.upstream_sha_guess) : "";
+            if (pr_link && upstream_sha_guess) {
+                return pr_link + ' / ' + upstream_sha_guess;
+            } else if (pr_link) {
+                return pr_link;
+            } else {
+                return upstream_sha_guess;
+            }
+        },
+        (item) => item.author
+    ];
 
     updateTable(table, headerRow, template,
         data.downstream_commits.filter(entry => !entry.upstream_sha));
@@ -186,13 +203,21 @@ function updateUpstreamOnlyTable(data) {
     var table = document.getElementById('tbl_commits_not_downstream');
     table.innerHTML = "";
 
-    const headerRow = ['Title', 'SHA', 'Committed date', 'Author'];
-    const template = {
-        title: (title) => title,
-        sha: (sha) => shaToLink(data.meta.upstream_url, sha),
-        seconds_since_epoch: (time) => utcSecondsToDate(time),
-        author: (author) => author
-    };
+    const headerRow = [
+        'Title',
+        'SHA',
+        'Guessed "fromlist" downstream SHA',
+        'Authored date',
+        'Committed date',
+        'Author'];
+    const template = [
+        (item) => item.title,
+        (item) => shaToLink(data.meta.upstream_url, item.sha),
+        (item) => item['downstream_sha_guess'] ? shaToLink(data.meta.downstream_url, item.downstream_sha_guess) : "",
+        (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
+        (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
+        (item) => item.author
+    ];
 
     updateTable(table, headerRow, template,
         data.upstream_commits.filter(entry => !entry.downstream_sha));
@@ -202,14 +227,31 @@ function updateFromListTable(data) {
     var table = document.getElementById('tbl_commits_fromlist');
     table.innerHTML = "";
 
-    const headerRow = ['Title', 'SHA', 'Committed date', 'Upstream PR', 'Author'];
-    const template = {
-        title: (title) => title,
-        sha: (sha) => shaToLink(data.meta.downstream_url, sha),
-        seconds_since_epoch: (time) => utcSecondsToDate(time),
-        upstream_pr: (upstream_pr) => prToLink(upstream_pr),
-        author: (author) => author
-    };
+    const headerRow = [
+        'Title',
+        'SHA',
+        'Authored date',
+        'Committed date',
+        'Upstream PR / Guessed upstream SHA',
+        'Author'];
+    const template = [
+        (item) => item.title,
+        (item) => shaToLink(data.meta.downstream_url, item.sha),
+        (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
+        (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
+        (item) => {
+            const pr_link = item['upstream_pr'] ? prToLink(item.upstream_pr) : "";
+            const upstream_sha_guess = item['upstream_sha_guess'] ? shaToLink(data.meta.upstream_url, item.upstream_sha_guess) : "";
+            if (pr_link && upstream_sha_guess) {
+                return pr_link + ' / ' + upstream_sha_guess;
+            } else if (pr_link) {
+                return pr_link;
+            } else {
+                return upstream_sha_guess;
+            }
+        },
+        (item) => item.author
+    ];
 
     updateTable(table, headerRow, template,
         data.downstream_commits.filter(entry => entry.upstream_pr));
@@ -219,14 +261,21 @@ function updateFromTreeTable(data) {
     var table = document.getElementById('tbl_commits_fromtree');
     table.innerHTML = "";
 
-    const headerRow = ['Title', 'SHA', 'Downstream SHA', 'Committed date', 'Author'];
-    const template = {
-        title: (title) => title,
-        sha: (sha) => shaToLink(data.meta.upstream_url, sha),
-        downstream_sha: (sha) => shaToLink(data.meta.downstream_url, sha),
-        seconds_since_epoch: (time) => utcSecondsToDate(time),
-        author: (author) => author
-    };
+    const headerRow = [
+        'Title',
+        'SHA',
+        'Downstream SHA',
+        'Authored date',
+        'Committed date',
+        'Author'];
+    const template = [
+        (item) => item.title,
+        (item) => shaToLink(data.meta.upstream_url, item.sha),
+        (item) => item['downstream_sha'] ? shaToLink(data.meta.downstream_url, item.downstream_sha) : "",
+        (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
+        (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
+        (item) => item.author
+    ];
 
     updateTable(table, headerRow, template,
         data.upstream_commits.filter(entry => entry.downstream_sha));
