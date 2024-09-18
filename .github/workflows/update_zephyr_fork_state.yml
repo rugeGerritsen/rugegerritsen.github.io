@@ -2,6 +2,8 @@ name: Update zephyr fork state
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
 
 jobs:
   run-python-file:
