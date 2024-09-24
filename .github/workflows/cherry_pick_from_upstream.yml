@@ -1,0 +1,96 @@
+name: Cherrypick commits from upstream
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream:
+        required: true
+        type: string
+        default: zephyrproject-rtos/zephyr
+      downstream:
+        required: true
+        type: string
+        default: nrfconnect/sdk-zephyr
+      user-fork-name:
+        required: true
+        type: string
+        default: sdk-zephyr
+      upstream-commits:
+        required: true
+        type: string
+        default: |
+          Provide a semicolumn separated string of commit SHAs\n
+          from the upstream repo to be cherry-picked to the downstream\n
+          repo. The first commit in the list will be cherry-picked\n
+          first. It should therefore represent the oldest commit.
+      new-commit-title-prefix:
+        required: true
+        type: string
+        default: '[nrf fromlist] '
+
+jobs:
+  cherry-pick-commits:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout upstream
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.upstream }}
+        fetch-depth: 0
+
+    - name: Setup git
+      run: |
+        git config user.name "${{ github.actor }}"
+        git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+
+    - name: Add downstream remotes
+      run: |
+        git remote add downstream 'https://github.com/${{ inputs.downstream }}'
+        git fetch downstream
+
+    - name: Cherry-pick commits
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        branch_name='auto_cherry_pick_'$(date '+%Y-%m-%d_%H_%M_%S')
+        git checkout -b $branch_name downstream/main
+
+        IFS=';' read -ra ADDR <<< "${{ inputs.upstream-commits }}"
+        for commit in "${ADDR[@]}"; do
+          git cherry-pick -x $commit
+        done
+
+        set FILTER_BRANCH_SQUELCH_WARNING=1
+        git filter-branch --msg-filter \
+          'printf "${{ inputs.new-commit-title-prefix }}" && cat' \
+          downstream/main..HEAD
+
+        git remote add user_remote https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.actor }}/${{ inputs.user-fork-name }}
+        git push --set-upstream user_remote $branch_name
+        gh pr create --title "Cherry-pick selected commits" --fill --base ${{ github.actor }}:main
+    # - name: Run Python script
+    #   env:
+    #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    #   run: |
+    #     git config --global user.name 'Rubin Gerritsen'
+    #     git config --global user.email 'rubin.gerritsen@nordicsemi.no'
+
+    #     cd repo
+    #     git remote add downstream 'https://github.com/${{ inputs.downstream }}'
+    #     git remote add user_remote 'https://github.com/${{ github.triggering_actor }}/${{ inputs.dowstream_user_remote_name }}'
+
+    #     cd ..
+    #     python fork_sync_status/cherry_pick_commits.py \
+    #     --user ${{ github.triggering_actor }} \
+    #     --upstream ${{ inputs.upstream }} \
+    #     --downstream ${{ inputs.downstream }} \
+    #     --commits ${{ inputs.upstream-commits }} \
+    #     --new-commit-title-prefix '${{ inputs.new-commit-title-prefix }}'
+
+    #     git config --global user.name 'Rubin Gerritsen'
+    #     git config --global user.email 'rubin.gerritsen@nordicsemi.no'
+
+    #     NEW_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    #     echo "Pushing new branch: $NEW_BRANCH"
+    #     git push --set-upstream user_remote $NEW_BRANCH
