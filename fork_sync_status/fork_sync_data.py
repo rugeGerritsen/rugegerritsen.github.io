@@ -36,7 +36,7 @@ class CommitRepr:
         self._upstream_pr = None
         self._downstream_sha = downstream_sha
         self._downstream_sha_guess = downstream_sha_guess
-        self._upstream_sha_guess = downstream_sha_guess
+        self._upstream_sha_guess = None
 
         if parse_message_for_upstream_info:
             self._set_upstream_pr_or_sha()
@@ -114,7 +114,8 @@ class CommitRepr:
     def _set_upstream_pr_or_sha(self):
         """Obtains upstream references based upon the commit message"""
 
-        if self._commit.summary.startswith("Revert"):
+        if self._commit.summary.startswith("Revert") or \
+            self._commit.summary.startswith("[nrf noup]"):
             return
         search_result = \
             self.RE_OBJ_UPSTREAM_PR_OR_SHA.search(self._commit.message)

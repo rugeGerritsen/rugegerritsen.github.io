@@ -23,7 +23,8 @@
         <legend>Select data source:</legend>
         <form>
             <input type="radio" id="option_server_data" name="radio_data_src" checked="checked">
-            <label for="option_server_data">Use latest data populated by github action</label><br>
+            <label for="option_server_data">Use <a href=data/data.json>latest data</a> populated by github
+                action</label><br>
             <input type="radio" id="option_upload" name="radio_data_src">
             <label for="option_upload">Upload local commit data</label><br>
         </form>
@@ -44,35 +45,60 @@
 
     <!-- Tab links -->
     <div class="tab">
-        <button class="tablinks" onclick="openTab(event, 'DownstreamOnly')" id="defaultOpen">Downstream only</button>
-        <button class="tablinks" onclick="openTab(event, 'UpstreamOnly')">Upstream only</button>
-        <button class="tablinks" onclick="openTab(event, 'CherryPicked')">Cherry-picked from upstream</button>
-        <button class="tablinks" onclick="openTab(event, 'UpstreamPr')">Cherry-picked from upstream PR</button>
+        <button class="tablinks" onclick="openTab(event, 'CherryPicked')"><b>Cherry-picked from upstream</b><br>[nrf
+            fromtree]</button>
+        <button class="tablinks" onclick="openTab(event, 'UpstreamPr')"><b>Cherry-picked from upstream PR</b><br>[nrf
+            fromlist]</button>
+        <button class="tablinks" onclick="openTab(event, 'NoUpCommits')"><b>Commits not intended for
+                upstream</b><br>[nrf noup]</button>
+        <button class="tablinks" onclick="openTab(event, 'UpstreamOnly')" id="defaultOpen"><b>Commits upstream without
+                downstream</b></button>
+        <button class="tablinks" onclick="openTab(event, 'DownstreamOnly')"><b>Commits downstream
+                without upstream</b><br>"[nrf noup]"<br>"[nrf fromlist]" not merged upstream<br>Additional
+            reverts</button>
     </div>
 
     <!-- Tab content -->
     <div id="DownstreamOnly" class="tabcontent">
-        Commits that are only present in the fork should only represent 'noup', 'fromlist', and 'revert' commits.
+        These commits do not have a corresponding upstream commit. In case of [nrf fromlist]-commits, these may arrive
+        upstream later.
         <br><br>
+        <label id="lbl_commits_only_downstream_count"></label><br>
         <table id="tbl_commits_only_downstream"></table>
     </div>
 
     <div id="UpstreamOnly" class="tabcontent">
-        Commits that have not yet been added to the fork.
+        These commits are not present in downstream.
         <br><br>
+
+        <label id="lbl_commits_not_downstream_count"></label><br>
         <table id="tbl_commits_not_downstream"></table>
     </div>
 
     <div id="CherryPicked" class="tabcontent">
-        Commits that have been cherry-picked from the upstream repo.
+        These commits have been cherry-picked from the upstream tree to downstream.
         <br><br>
+
+        <label id="lbl_commits_fromtree_count"></label><br>
         <table id="tbl_commits_fromtree"></table>
     </div>
 
     <div id="UpstreamPr" class="tabcontent">
-        Commits that have been cherry-picked from upstream before they were merged to upstream.
+        These commits have been cherry-picked from a PR upstream.
+        The commits may or may not have been merged to the upstream tree.
         <br><br>
+
+        <label id="lbl_commits_fromlist_count"></label><br>
         <table id="tbl_commits_fromlist"></table>
+    </div>
+
+    <div id="NoUpCommits" class="tabcontent">
+        These commits are not intended for upstream.
+        This list represents how much the fork has diverged in the long term.
+        <br><br>
+
+        <label id="lbl_commits_noup_count"></label><br>
+        <table id="tbl_commits_noup"></table>
     </div>
 
 </body>

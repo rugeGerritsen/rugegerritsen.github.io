@@ -1,20 +1,4 @@
 
-function countNoUpCommits(data) {
-    return data.downstream_commits.filter(data => data.title.startsWith("[nrf noup]")).length;
-}
-
-function countFromListCommits(data) {
-    return data.downstream_commits.filter(data => data.title.startsWith("[nrf fromlist]")).length;
-}
-
-function countFromTreeCommits(data) {
-    return data.downstream_commits.filter(data => data.title.startsWith("[nrf fromtree]")).length;
-}
-
-function countCommitsToBeSynced(data) {
-    return data.upstream_commits.length - countFromListCommits(data);
-}
-
 function shaToLink(repo_name, sha) {
     const short_sha = sha.substring(0, 10);
     return `<a href="${repo_name}/commit/${sha}">${short_sha}</a>`;
@@ -38,12 +22,14 @@ function displayData(data) {
     updateUpstreamOnlyTable(data);
     updateFromListTable(data);
     updateFromTreeTable(data);
+    updateNoUpTable(data);
 
     document.getElementById("defaultOpen").click();
 }
 
-function filterColumn(table, input, column) {
+function filterColumn(table, input, column, summary_lbl) {
     var regex;
+
     try {
         regex = new RegExp('^' + input + '$');
         table.rows[1].cells[column].style.backgroundColor = "green";
@@ -56,11 +42,15 @@ function filterColumn(table, input, column) {
      * This is way much faster for larger tables. */
     var newTable = table.cloneNode(true)
 
+    let totalCount = 0;
+    let visibleCount = 0;
     for (let i = 2; i < newTable.rows.length; i++) {
         const row = newTable.rows[i]; // Access each row
         const cell_value = row.cells[column].innerText;
 
+        totalCount++;
         if (cell_value.match(regex)) {
+            visibleCount++;
             row.style.display = "table-row";
         } else {
             row.style.display = "none";
@@ -74,7 +64,7 @@ function filterColumn(table, input, column) {
 
         /* Add listener for the filter key. */
         input.addEventListener('input', () => {
-            filterColumn(newTable, input.value, i)
+            filterColumn(newTable, input.value, i, summary_lbl)
         });
     }
 
@@ -89,9 +79,12 @@ function filterColumn(table, input, column) {
         old_selection_end,
     )
     newTable.rows[1].cells[column].children[0].focus()
+
+    const label = document.getElementById(summary_lbl);
+    label.innerHTML = "Showing " + visibleCount + " out of " + totalCount + " elements";
 }
 
-function updateTable(table, headerRow, template, commits) {
+function updateTable(table, headerRow, template, commits, summary_lbl) {
     row = table.insertRow();
     row.style.backgroundColor = "#333f67";
     row.style.color = "white";
@@ -114,12 +107,14 @@ function updateTable(table, headerRow, template, commits) {
 
         /* Add listener for the filter key. */
         input.addEventListener('input', () => {
-            filterColumn(table, input.value, index)
+            filterColumn(table, input.value, index, summary_lbl)
         });
     }
     table.appendChild(row);
 
+    let commitCount = 0;
     commits.forEach(item => {
+        commitCount++;
         row = table.insertRow()
         template.forEach(entry => {
             const cell = document.createElement("td");
@@ -133,6 +128,9 @@ function updateTable(table, headerRow, template, commits) {
             row.appendChild(cell);
         });
     });
+
+    const label = document.getElementById(summary_lbl);
+    label.innerHTML = "Showing " + commitCount + " out of " + commitCount + " elements";
 }
 
 function updateDataSourceTable(data) {
@@ -148,10 +146,35 @@ function updateDataSourceTable(data) {
         { title: "Data was obtained at", val: utcSecondsToDate(data.meta.authored_seconds_since_epoch) },
         { title: "Last rebase/Merge base SHA", val: shaToLink(data.meta.downstream_url, data.merge_base.sha) },
         { title: "Last rebase/Merge base timestamp", val: utcSecondsToDate(data.merge_base.authored_seconds_since_epoch) },
-        { title: "Number of noup commits", val: countNoUpCommits(data) },
-        { title: "Number of fromlist commits", val: countFromListCommits(data) },
-        { title: "Number of fromtree commits", val: countFromTreeCommits(data) },
-        { title: "Number of commits upstream only", val: countCommitsToBeSynced(data) }
+        { title: "", val: "" },
+        { title: "Number of downstream commits after last rebase/Merge base", val: data.downstream_commits.length },
+        { title: "Number of commits upstream after last rebase/Merge base", val: data.upstream_commits.length },
+        { title: "", val: "" },
+        {
+            title: "Number of downstream noup commits",
+            val: data.downstream_commits.filter(data => data.title.startsWith("[nrf noup]")).length
+        },
+        {
+            title: "Number of downstream fromtree commits",
+            val: data.downstream_commits.filter(data => data.title.startsWith("[nrf fromtree]")).length
+        },
+        {
+            title: "Number of downstream fromlist commits",
+            val: data.downstream_commits.filter(data => data.title.startsWith("[nrf fromlist]")).length
+        },
+        {
+            title: "Number of downstream fromlist commits likely merged",
+            val: data.downstream_commits.filter(data => data.title.startsWith("[nrf fromlist]")).filter(data => data.upstream_sha_guess).length
+        },
+        {
+            title: "Number of downstream fromlist commits likely not yet merged",
+            val: data.downstream_commits.filter(data => data.title.startsWith("[nrf fromlist]")).filter(data => !data.upstream_sha_guess).length
+        },
+        { title: "", val: "" },
+        {
+            title: "Number of commits upstream only",
+            val: data.upstream_commits.filter(entry => !(entry.downstream_sha || entry.downstream_sha_guess)).length
+        }
     ];
 
     entries.forEach(item => {
@@ -174,29 +197,20 @@ function updateDownstreamOnlyTable(data) {
         'SHA',
         'Authored date',
         'Committed date',
-        'Upstream PR / Guessed upstream SHA',
+        'Upstream PR',
         'Author'];
     const template = [
         (item) => item.title,
         (item) => shaToLink(data.meta.downstream_url, item.sha),
         (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
         (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
-        (item) => {
-            const pr_link = item['upstream_pr'] ? prToLink(item.upstream_pr) : "";
-            const upstream_sha_guess = item['upstream_sha_guess'] ? shaToLink(data.meta.upstream_url, item.upstream_sha_guess) : "";
-            if (pr_link && upstream_sha_guess) {
-                return pr_link + ' / ' + upstream_sha_guess;
-            } else if (pr_link) {
-                return pr_link;
-            } else {
-                return upstream_sha_guess;
-            }
-        },
-        (item) => item.author
+        (item) => item['upstream_pr'] ? prToLink(item.upstream_pr) : "",
+        (item) => item.author,
     ];
 
     updateTable(table, headerRow, template,
-        data.downstream_commits.filter(entry => !entry.upstream_sha));
+        data.downstream_commits.filter(entry => !(entry.upstream_sha || entry.upstream_sha_guess)),
+        'lbl_commits_only_downstream_count');
 }
 
 function updateUpstreamOnlyTable(data) {
@@ -206,21 +220,20 @@ function updateUpstreamOnlyTable(data) {
     const headerRow = [
         'Title',
         'SHA',
-        'Guessed "fromlist" downstream SHA',
         'Authored date',
         'Committed date',
         'Author'];
     const template = [
         (item) => item.title,
         (item) => shaToLink(data.meta.upstream_url, item.sha),
-        (item) => item['downstream_sha_guess'] ? shaToLink(data.meta.downstream_url, item.downstream_sha_guess) : "",
         (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
         (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
         (item) => item.author
     ];
 
     updateTable(table, headerRow, template,
-        data.upstream_commits.filter(entry => !entry.downstream_sha));
+        data.upstream_commits.filter(entry => !(entry.downstream_sha || entry.downstream_sha_guess)),
+        'lbl_commits_not_downstream_count');
 }
 
 function updateFromListTable(data) {
@@ -254,7 +267,8 @@ function updateFromListTable(data) {
     ];
 
     updateTable(table, headerRow, template,
-        data.downstream_commits.filter(entry => entry.upstream_pr));
+        data.downstream_commits.filter(entry => entry.upstream_pr),
+        'lbl_commits_fromlist_count');
 }
 
 function updateFromTreeTable(data) {
@@ -264,21 +278,45 @@ function updateFromTreeTable(data) {
     const headerRow = [
         'Title',
         'SHA',
-        'Downstream SHA',
+        'Upstream SHA',
         'Authored date',
         'Committed date',
         'Author'];
     const template = [
         (item) => item.title,
-        (item) => shaToLink(data.meta.upstream_url, item.sha),
-        (item) => item['downstream_sha'] ? shaToLink(data.meta.downstream_url, item.downstream_sha) : "",
+        (item) => shaToLink(data.meta.downstream_url, item.sha),
+        (item) => item['upstream_sha'] ? shaToLink(data.meta.upstream_url, item.upstream_sha) : "",
         (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
         (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
         (item) => item.author
     ];
 
     updateTable(table, headerRow, template,
-        data.upstream_commits.filter(entry => entry.downstream_sha));
+        data.downstream_commits.filter(entry => entry.upstream_sha),
+        'lbl_commits_fromtree_count');
+}
+
+function updateNoUpTable(data) {
+    var table = document.getElementById('tbl_commits_noup');
+    table.innerHTML = "";
+
+    const headerRow = [
+        'Title',
+        'SHA',
+        'Authored date',
+        'Committed date',
+        'Author'];
+    const template = [
+        (item) => item.title,
+        (item) => shaToLink(data.meta.downstream_url, item.sha),
+        (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
+        (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
+        (item) => item.author
+    ];
+
+    updateTable(table, headerRow, template,
+        data.downstream_commits.filter(entry => entry.title.startsWith("[nrf noup]")),
+        'lbl_commits_noup_count');
 }
 
 function openTab(evt, tabName) {
