@@ -26,6 +26,9 @@ class CommitRepr:
     RE_OBJ_UPSTREAM_PR_OR_SHA = \
         re.compile('(' + RE_UPSTREAM_PR + ')|(' + RE_UPSTREAM_SHA + ')', re.MULTILINE)
 
+    RE_REVERT = \
+        re.compile(r'^This reverts commit (?P<sha>[0-9a-f]+)', re.MULTILINE)
+
     def __init__(self,
                  commit: git.Commit,
                  parse_message_for_upstream_info=False,
@@ -37,14 +40,40 @@ class CommitRepr:
         self._downstream_sha = downstream_sha
         self._downstream_sha_guess = downstream_sha_guess
         self._upstream_sha_guess = None
+        self._reverts_sha = None
+        self._reverted_by_sha = None
 
         if parse_message_for_upstream_info:
             self._set_upstream_pr_or_sha()
+
+        if self._commit.summary.startswith("Revert"):
+            search_result = self.RE_REVERT.search(self._commit.message)
+
+            if search_result:
+                search_result_dict = search_result.groupdict()
+                self._reverts_sha = search_result_dict.get('sha', None)
+
+            return
 
     @property
     def sha(self) -> str:
         """Get the SHA of the commit"""
         return str(self._commit)
+
+    @property
+    def reverts_sha(self) -> str:
+        """The SHA the commit reverts"""
+        return self._reverts_sha
+
+    @property
+    def reverted_by_sha(self) -> str:
+        """Returns the SHA of the commit that reverts this commit"""
+        return self._reverted_by_sha
+
+    @reverted_by_sha.setter
+    def reverted_by_sha(self, sha):
+        """Sets the SHA of the commit that reverts this commit"""
+        self._reverted_by_sha = sha
 
     @property
     def upstream_sha(self) -> str:
@@ -108,6 +137,10 @@ class CommitRepr:
             representation['downstream_sha_guess'] = self._downstream_sha_guess
         if self._upstream_sha_guess:
             representation['upstream_sha_guess'] = self._upstream_sha_guess
+        if self._reverts_sha:
+            representation['reverts_sha'] = self._reverts_sha
+        if self._reverted_by_sha:
+            representation['reverted_by_sha'] = self._reverted_by_sha
 
         return representation
 
@@ -195,6 +228,7 @@ def get_fork_sync_data(upstream_commits: typing.Iterator[git.Commit],
     # This will be used when mapping upstream to downstream commits.
     upstream_commits_with_downstream = {}
     downstream_commit_titles_with_possible_upstream = {}
+    revert_sha_to_reverted_by_sha = {}
     temp_downstream_item_list = []
 
     data['downstream_commits'] = []
@@ -210,6 +244,11 @@ def get_fork_sync_data(upstream_commits: typing.Iterator[git.Commit],
                 upstream_commit_title = commit.summary
 
             downstream_commit_titles_with_possible_upstream[upstream_commit_title] = item
+
+        if item.reverts_sha:
+            revert_sha_to_reverted_by_sha[item.reverts_sha] = item.sha
+
+        item.reverted_by_sha = revert_sha_to_reverted_by_sha.get(item.sha)
 
     data['upstream_commits'] = []
     for commit in upstream_commits:

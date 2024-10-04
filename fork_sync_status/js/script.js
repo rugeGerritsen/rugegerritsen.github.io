@@ -1,3 +1,6 @@
+function show_reverts_selected() {
+    return document.getElementById('checkbox_show_reverted').checked;
+}
 
 function shaToLink(repo_name, sha) {
     const short_sha = sha.substring(0, 10);
@@ -23,8 +26,7 @@ function displayData(data) {
     updateFromListTable(data);
     updateFromTreeTable(data);
     updateNoUpTable(data);
-
-    document.getElementById("defaultOpen").click();
+    updateRevertedDownstreamTable(data);
 }
 
 function filterColumn(table, input, column, summary_lbl) {
@@ -49,6 +51,7 @@ function filterColumn(table, input, column, summary_lbl) {
         const cell_value = row.cells[column].innerText;
 
         totalCount++;
+
         if (cell_value.match(regex)) {
             visibleCount++;
             row.style.display = "table-row";
@@ -81,7 +84,7 @@ function filterColumn(table, input, column, summary_lbl) {
     newTable.rows[1].cells[column].children[0].focus()
 
     const label = document.getElementById(summary_lbl);
-    label.innerHTML = "Showing " + visibleCount + " out of " + totalCount + " elements";
+    label.innerHTML = "Showing " + visibleCount + " out of " + totalCount + " elements. ";
 }
 
 function updateTable(table, headerRow, template, commits, summary_lbl) {
@@ -112,25 +115,29 @@ function updateTable(table, headerRow, template, commits, summary_lbl) {
     }
     table.appendChild(row);
 
+    const show_reverts = show_reverts_selected();
+
     let commitCount = 0;
     commits.forEach(item => {
-        commitCount++;
-        row = table.insertRow()
-        template.forEach(entry => {
-            const cell = document.createElement("td");
-            const val = entry(item);
-            if (val) {
-                cell.innerHTML = val;
-            } else {
-                cell.innerText = "";
-            }
+        if ((!item.reverted_by_sha && !item.reverts_sha) || show_reverts) {
+            commitCount++;
+            row = table.insertRow()
+            template.forEach(entry => {
+                const cell = document.createElement("td");
+                const val = entry(item);
+                if (val) {
+                    cell.innerHTML = val;
+                } else {
+                    cell.innerText = "";
+                }
 
-            row.appendChild(cell);
-        });
+                row.appendChild(cell);
+            });
+        }
     });
 
     const label = document.getElementById(summary_lbl);
-    label.innerHTML = "Showing " + commitCount + " out of " + commitCount + " elements";
+    label.innerHTML = "Showing " + commitCount + " out of " + commitCount + " elements.";
 }
 
 function updateDataSourceTable(data) {
@@ -147,28 +154,32 @@ function updateDataSourceTable(data) {
         { title: "Last rebase/Merge base SHA", val: shaToLink(data.meta.downstream_url, data.merge_base.sha) },
         { title: "Last rebase/Merge base timestamp", val: utcSecondsToDate(data.merge_base.authored_seconds_since_epoch) },
         { title: "", val: "" },
-        { title: "Number of downstream commits after last rebase/Merge base", val: data.downstream_commits.length },
         { title: "Number of commits upstream after last rebase/Merge base", val: data.upstream_commits.length },
+        { title: "Number of downstream commits after last rebase/Merge base", val: data.downstream_commits.length },
+        {
+            title: "Number of reverted downstream commits after last rebase/Merge base",
+            val: data.downstream_commits.filter(entry => entry.reverted_by_sha).length
+        },
         { title: "", val: "" },
         {
             title: "Number of downstream noup commits",
-            val: data.downstream_commits.filter(data => data.title.startsWith("[nrf noup]")).length
+            val: data.downstream_commits.filter(item => !item.reverted_by_sha && item.title.startsWith("[nrf noup]")).length
         },
         {
             title: "Number of downstream fromtree commits",
-            val: data.downstream_commits.filter(data => data.title.startsWith("[nrf fromtree]")).length
+            val: data.downstream_commits.filter(item => !item.reverted_by_sha && item.title.startsWith("[nrf fromtree]")).length
         },
         {
             title: "Number of downstream fromlist commits",
-            val: data.downstream_commits.filter(data => data.title.startsWith("[nrf fromlist]")).length
+            val: data.downstream_commits.filter(item => !item.reverted_by_sha && item.title.startsWith("[nrf fromlist]")).length
         },
         {
             title: "Number of downstream fromlist commits likely merged",
-            val: data.downstream_commits.filter(data => data.title.startsWith("[nrf fromlist]")).filter(data => data.upstream_sha_guess).length
+            val: data.downstream_commits.filter(item => !item.reverted_by_sha && item.title.startsWith("[nrf fromlist]")).filter(item => item.upstream_sha_guess).length
         },
         {
             title: "Number of downstream fromlist commits likely not yet merged",
-            val: data.downstream_commits.filter(data => data.title.startsWith("[nrf fromlist]")).filter(data => !data.upstream_sha_guess).length
+            val: data.downstream_commits.filter(item => !item.reverted_by_sha && item.title.startsWith("[nrf fromlist]")).filter(item => !item.upstream_sha_guess).length
         },
         { title: "", val: "" },
         {
@@ -192,14 +203,14 @@ function updateDownstreamOnlyTable(data) {
     var table = document.getElementById('tbl_commits_only_downstream');
     table.innerHTML = "";
 
-    const headerRow = [
+    let headerRow = [
         'Title',
         'SHA',
         'Authored date',
         'Committed date',
         'Upstream PR',
         'Author'];
-    const template = [
+    let template = [
         (item) => item.title,
         (item) => shaToLink(data.meta.downstream_url, item.sha),
         (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
@@ -207,6 +218,11 @@ function updateDownstreamOnlyTable(data) {
         (item) => item['upstream_pr'] ? prToLink(item.upstream_pr) : "",
         (item) => item.author,
     ];
+
+    if (show_reverts_selected()) {
+        headerRow.push('Reverted by');
+        template.push((item) => item.reverted_by_sha ? shaToLink(data.meta.downstream_url, item.reverted_by_sha) : "");
+    }
 
     updateTable(table, headerRow, template,
         data.downstream_commits.filter(entry => !(entry.upstream_sha || entry.upstream_sha_guess)),
@@ -217,7 +233,7 @@ function updateUpstreamOnlyTable(data) {
     var table = document.getElementById('tbl_commits_not_downstream');
     table.innerHTML = "";
 
-    const headerRow = [
+    var headerRow = [
         'Title',
         'SHA',
         'Authored date',
@@ -266,6 +282,11 @@ function updateFromListTable(data) {
         (item) => item.author
     ];
 
+    if (show_reverts_selected()) {
+        headerRow.push('Reverted by');
+        template.push((item) => item.reverted_by_sha ? shaToLink(data.meta.downstream_url, item.reverted_by_sha) : "");
+    }
+
     updateTable(table, headerRow, template,
         data.downstream_commits.filter(entry => entry.upstream_pr),
         'lbl_commits_fromlist_count');
@@ -291,6 +312,11 @@ function updateFromTreeTable(data) {
         (item) => item.author
     ];
 
+    if (show_reverts_selected()) {
+        headerRow.push('Reverted by');
+        template.push((item) => item.reverted_by_sha ? shaToLink(data.meta.downstream_url, item.reverted_by_sha) : "");
+    }
+
     updateTable(table, headerRow, template,
         data.downstream_commits.filter(entry => entry.upstream_sha),
         'lbl_commits_fromtree_count');
@@ -314,9 +340,39 @@ function updateNoUpTable(data) {
         (item) => item.author
     ];
 
+    if (show_reverts_selected()) {
+        headerRow.push('Reverted by');
+        template.push((item) => item.reverted_by_sha ? shaToLink(data.meta.downstream_url, item.reverted_by_sha) : "");
+    }
+
     updateTable(table, headerRow, template,
         data.downstream_commits.filter(entry => entry.title.startsWith("[nrf noup]")),
         'lbl_commits_noup_count');
+}
+
+function updateRevertedDownstreamTable(data) {
+    var table = document.getElementById('tbl_commits_reverted_downstream');
+    table.innerHTML = "";
+
+    const headerRow = [
+        'Title',
+        'SHA',
+        'Reverted by',
+        'Authored date',
+        'Committed date',
+        'Author'];
+    const template = [
+        (item) => item.title,
+        (item) => shaToLink(data.meta.downstream_url, item.sha),
+        (item) => shaToLink(data.meta.downstream_url, item.reverted_by_sha),
+        (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
+        (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
+        (item) => item.author
+    ];
+
+    updateTable(table, headerRow, template,
+        data.downstream_commits.filter(entry => entry.reverted_by_sha),
+        'lbl_commits_reverted_downstream_count');
 }
 
 function openTab(evt, tabName) {
@@ -378,5 +434,6 @@ function onPageLoad() {
     });
 
     loadFromCache();
+    document.getElementById("defaultOpen").click();
 }
 

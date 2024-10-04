@@ -42,6 +42,8 @@
         Limitation: The implementation is currently only filtering based upon the last updated filter.
     </p>
 
+    <b>Show downstream reverts and reverted commits: </b><input type="checkbox" id="checkbox_show_reverted" onchange="loadFromCache()"> (This may make it harder to see what commit are really applied)
+    <br><br>
 
     <!-- Tab links -->
     <div class="tab">
@@ -56,6 +58,7 @@
         <button class="tablinks" onclick="openTab(event, 'DownstreamOnly')"><b>Commits downstream
                 without upstream</b><br>"[nrf noup]"<br>"[nrf fromlist]" not merged upstream<br>Additional
             reverts</button>
+        <button class="tablinks" onclick="openTab(event, 'RevertedDownstream')"><b>Downstream reverted commits</b></button>
     </div>
 
     <!-- Tab content -->
@@ -99,6 +102,16 @@
 
         <label id="lbl_commits_noup_count"></label><br>
         <table id="tbl_commits_noup"></table>
+    </div>
+
+    <div id="RevertedDownstream" class="tabcontent">
+        These commits are downstream only, but already reverted.
+        These commits are often reapplied later after inserting another commit first that
+        would otherwise result in a conflict.
+        <br><br>
+
+        <label id="lbl_commits_reverted_downstream_count"></label><br>
+        <table id="tbl_commits_reverted_downstream"></table>
     </div>
 
 </body>
