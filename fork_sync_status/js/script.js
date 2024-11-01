@@ -7,9 +7,8 @@ function shaToLink(repo_name, sha) {
     return `<a href="${repo_name}/commit/${sha}">${short_sha}</a>`;
 }
 
-function prToLink(prLink) {
-    const pr_number = prLink.split('/').at(-1);
-    return `<a href="${prLink}">#${pr_number}</a>`;
+function prToLink(repo_name, pr_number) {
+    return `<a href="${repo_name}/pull/${pr_number}">#${pr_number}</a>`;
 }
 
 function utcSecondsToDate(utcSeconds) {
@@ -215,7 +214,7 @@ function updateDownstreamOnlyTable(data) {
         (item) => shaToLink(data.meta.downstream_url, item.sha),
         (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
         (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
-        (item) => item['upstream_pr'] ? prToLink(item.upstream_pr) : "",
+        (item) => item['upstream_pr'] ? prToLink(data.meta.upstream_url, item.upstream_pr) : "",
         (item) => item.author,
     ];
 
@@ -269,7 +268,7 @@ function updateFromListTable(data) {
         (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
         (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
         (item) => {
-            const pr_link = item['upstream_pr'] ? prToLink(item.upstream_pr) : "";
+            const pr_link = item['upstream_pr'] ? prToLink(data.meta.upstream_url, item.upstream_pr) : "";
             const upstream_sha_guess = item['upstream_sha_guess'] ? shaToLink(data.meta.upstream_url, item.upstream_sha_guess) : "";
             if (pr_link && upstream_sha_guess) {
                 return pr_link + ' / ' + upstream_sha_guess;

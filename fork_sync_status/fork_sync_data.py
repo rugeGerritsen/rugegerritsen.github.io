@@ -19,7 +19,7 @@ class CommitRepr:
     """
 
     RE_UPSTREAM_PR = \
-        r'^Upstream PR: (?P<upstream_pr>.+)'
+        r'^Upstream PR(| #): (?P<upstream_pr>.+)'
     RE_UPSTREAM_SHA = \
         r'^\(cherry picked from commit (?P<upstream_sha>[0-9a-f]+)\)'
 
@@ -82,7 +82,7 @@ class CommitRepr:
 
     @property
     def upstream_pr(self) -> str:
-        """Returns the upstream PR link"""
+        """Returns the upstream PR ID"""
         return self._upstream_pr
 
     @property
@@ -156,7 +156,13 @@ class CommitRepr:
         if search_result:
             search_result_dict = search_result.groupdict()
             self._upstream_sha = search_result_dict.get('upstream_sha', None)
-            self._upstream_pr = search_result_dict.get('upstream_pr', None)
+            
+            upstream_pr = search_result_dict.get('upstream_pr', None)
+            if upstream_pr:
+                if isinstance(upstream_pr, int):
+                    self._upstream_pr = upstream_pr
+                else:
+                    self._upstream_pr = upstream_pr.split('/')[-1]
 
 def clone_repo_with_remote(local_dir: pathlib.Path,
                            repo_url: str,
