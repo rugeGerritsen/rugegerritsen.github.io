@@ -63,6 +63,10 @@ function filterColumn(table, input, column, summary_lbl) {
     for (let i = 0; i < newTable.rows[1].cells.length; i++) {
         var cell = newTable.rows[1].cells[i];
         const input = cell.children[0];
+        
+        if (i != column) {
+            input.value = '.*';
+        }
 
         /* Add listener for the filter key. */
         input.addEventListener('input', () => {
