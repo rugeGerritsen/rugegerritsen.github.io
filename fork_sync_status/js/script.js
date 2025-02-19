@@ -1,3 +1,5 @@
+var currentTab;
+
 function show_reverts_selected() {
     return document.getElementById('checkbox_show_reverted').checked;
 }
@@ -26,6 +28,21 @@ function displayData(data) {
     updateFromTreeTable(data);
     updateNoUpTable(data);
     updateRevertedDownstreamTable(data);
+}
+
+function updateUrl(currentTab, table) {
+    /* Update URL so that it can be shared with others. */
+    const baseUrl = `${window.location.origin}${window.location.pathname}`;
+    var newUrl = baseUrl + `?tab=${currentTab}`;
+
+    if (table.rows[1]) {
+        for (let index = 0; index < table.rows[1].cells.length; index++) {
+            const value = table.rows[1].cells[index].children[0].value;
+            newUrl += `&f${index}=${value}`;
+        }
+    }
+
+    window.history.pushState({ path: newUrl }, '', newUrl);
 }
 
 function filterColumn(table, input, column, summary_lbl) {
@@ -63,7 +80,7 @@ function filterColumn(table, input, column, summary_lbl) {
     for (let i = 0; i < newTable.rows[1].cells.length; i++) {
         var cell = newTable.rows[1].cells[i];
         const input = cell.children[0];
-        
+
         if (i != column) {
             input.value = '.*';
         }
@@ -88,6 +105,8 @@ function filterColumn(table, input, column, summary_lbl) {
 
     const label = document.getElementById(summary_lbl);
     label.innerHTML = "Showing " + visibleCount + " out of " + totalCount + " elements. ";
+
+    updateUrl(currentTab, table);
 }
 
 function updateTable(table, headerRow, template, commits, summary_lbl) {
@@ -101,11 +120,25 @@ function updateTable(table, headerRow, template, commits, summary_lbl) {
     });
     table.appendChild(row);
 
+    var url_params = new URLSearchParams(window.location.search);
+    var url_tab_matching = ("tbl_" + url_params.get('tab') == table.id);
+
     row = table.insertRow();
     for (let index = 0; index < headerRow.length; index++) {
         const cell = document.createElement("td");
         const input = document.createElement("input");
-        input.value = '.*'
+
+        if (url_tab_matching) {
+            value = url_params.get('f' + index.toString())
+            if (value) {
+                input.value = value;
+            } else {
+                input.value = '.*'
+            }
+        } else {
+            input.value = '.*'
+        }
+
         cell.style.backgroundColor = "green";
 
         cell.appendChild(input);
@@ -113,7 +146,7 @@ function updateTable(table, headerRow, template, commits, summary_lbl) {
 
         /* Add listener for the filter key. */
         input.addEventListener('input', () => {
-            filterColumn(table, input.value, index, summary_lbl)
+            filterColumn(table, input.value, index, summary_lbl);
         });
     }
     table.appendChild(row);
@@ -395,8 +428,18 @@ function openTab(evt, tabName) {
     }
 
     // Show the current tab, and add an "active" class to the button that opened the tab
-    document.getElementById(tabName).style.display = "block";
+    var tab = document.getElementById(tabName);
+    tab.style.display = "block";
     evt.currentTarget.className += " active";
+
+    var tableId = tab.childNodes[7].id;
+    currentTab = tableId.substring(4);
+
+    var table = document.getElementById(tableId);
+    if (table.rows[1]) {
+        /* Only update url when data already exists. This avoid clearing data when loading url. */
+        updateUrl(currentTab, table);
+    }
 }
 
 function loadFromCache() {
@@ -437,6 +480,13 @@ function onPageLoad() {
     });
 
     loadFromCache();
-    document.getElementById("defaultOpen").click();
-}
 
+    var url_params = new URLSearchParams(window.location.search);
+
+    tab = url_params.get('tab');
+    if (tab) {
+        document.getElementById(tab).click();
+    } else {
+        document.getElementById("commits_not_downstream").click();
+    }
+}

@@ -46,18 +46,18 @@
 
     <!-- Tab links -->
     <div class="tab">
-        <button class="tablinks" onclick="openTab(event, 'CherryPicked')"><b>Cherry-picked from upstream</b><br>[nrf
+        <button class="tablinks" onclick="openTab(event, 'CherryPicked')" id="commits_fromtree"><b>Cherry-picked from upstream</b><br>[nrf
             fromtree]</button>
-        <button class="tablinks" onclick="openTab(event, 'UpstreamPr')"><b>Cherry-picked from upstream PR</b><br>[nrf
+        <button class="tablinks" onclick="openTab(event, 'UpstreamPr')" id="commits_fromlist"><b>Cherry-picked from upstream PR</b><br>[nrf
             fromlist]</button>
-        <button class="tablinks" onclick="openTab(event, 'NoUpCommits')"><b>Commits not intended for
+        <button class="tablinks" onclick="openTab(event, 'NoUpCommits')" id="commits_noup"><b>Commits not intended for
                 upstream</b><br>[nrf noup]</button>
-        <button class="tablinks" onclick="openTab(event, 'UpstreamOnly')" id="defaultOpen"><b>Commits upstream without
+        <button class="tablinks" onclick="openTab(event, 'UpstreamOnly')" id="commits_not_downstream"><b>Commits upstream without
                 downstream</b></button>
-        <button class="tablinks" onclick="openTab(event, 'DownstreamOnly')"><b>Commits downstream
+        <button class="tablinks" onclick="openTab(event, 'DownstreamOnly')" id="commits_only_downstream"><b>Commits downstream
                 without upstream</b><br>"[nrf noup]"<br>"[nrf fromlist]" not merged upstream<br>Additional
             reverts</button>
-        <button class="tablinks" onclick="openTab(event, 'RevertedDownstream')"><b>Downstream reverted commits</b></button>
+        <button class="tablinks" onclick="openTab(event, 'RevertedDownstream')" id="commits_reverted_downstream"><b>Downstream reverted commits</b></button>
     </div>
 
     <!-- Tab content -->
