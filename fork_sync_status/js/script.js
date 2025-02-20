@@ -45,8 +45,10 @@ function updateUrl(currentTab, table) {
     window.history.pushState({ path: newUrl }, '', newUrl);
 }
 
-function filterColumn(table, input, column, summary_lbl) {
+function filterColumn(table_id, input, column, summary_lbl) {
     var regex;
+
+    var table = document.getElementById(table_id);
 
     try {
         regex = new RegExp('^' + input + '$');
@@ -87,7 +89,7 @@ function filterColumn(table, input, column, summary_lbl) {
 
         /* Add listener for the filter key. */
         input.addEventListener('input', () => {
-            filterColumn(newTable, input.value, i, summary_lbl)
+            filterColumn(newTable.id, input.value, i, summary_lbl)
         });
     }
 
@@ -123,33 +125,23 @@ function updateTable(table, headerRow, template, commits, summary_lbl) {
     var url_params = new URLSearchParams(window.location.search);
     var url_tab_matching = ("tbl_" + url_params.get('tab') == table.id);
 
-    row = table.insertRow();
+    headerRowData = table.insertRow();
     for (let index = 0; index < headerRow.length; index++) {
         const cell = document.createElement("td");
         const input = document.createElement("input");
-
-        if (url_tab_matching) {
-            value = url_params.get('f' + index.toString())
-            if (value) {
-                input.value = value;
-            } else {
-                input.value = '.*'
-            }
-        } else {
-            input.value = '.*'
-        }
+        input.value = '.*'
 
         cell.style.backgroundColor = "green";
 
         cell.appendChild(input);
-        row.appendChild(cell);
+        headerRowData.appendChild(cell);
 
         /* Add listener for the filter key. */
         input.addEventListener('input', () => {
-            filterColumn(table, input.value, index, summary_lbl);
+            filterColumn(table.id, input.value, index, summary_lbl);
         });
     }
-    table.appendChild(row);
+    table.appendChild(headerRowData);
 
     const show_reverts = show_reverts_selected();
 
@@ -174,6 +166,16 @@ function updateTable(table, headerRow, template, commits, summary_lbl) {
 
     const label = document.getElementById(summary_lbl);
     label.innerHTML = "Showing " + commitCount + " out of " + commitCount + " elements.";
+
+    if (url_tab_matching) {
+        for (let index = 0; index < headerRowData.children.length; index++) {
+            value = url_params.get('f' + index.toString());
+            if (value && value != '.*') {
+                headerRowData.children[index].children[0].value = value;
+                headerRowData.children[index].children[0].dispatchEvent(new Event('input', {bubbles: true}));
+            }
+        }
+    }
 }
 
 function updateDataSourceTable(data) {
