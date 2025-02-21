@@ -247,7 +247,8 @@ function updateDownstreamOnlyTable(data) {
         'Authored date',
         'Committed date',
         'Upstream PR',
-        'Author'];
+        'Author',
+        'Author Email'];
     let template = [
         (item) => item.title,
         (item) => shaToLink(data.meta.downstream_url, item.sha),
@@ -255,6 +256,7 @@ function updateDownstreamOnlyTable(data) {
         (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
         (item) => item['upstream_pr'] ? prToLink(data.meta.upstream_url, item.upstream_pr) : "",
         (item) => item.author,
+        (item) => item.author_email,
     ];
 
     if (show_reverts_selected()) {
@@ -276,13 +278,15 @@ function updateUpstreamOnlyTable(data) {
         'SHA',
         'Authored date',
         'Committed date',
-        'Author'];
+        'Author',
+        'Author Email'];
     const template = [
         (item) => item.title,
         (item) => shaToLink(data.meta.upstream_url, item.sha),
         (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
         (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
-        (item) => item.author
+        (item) => item.author,
+        (item) => item.author_email,
     ];
 
     updateTable(table, headerRow, template,
@@ -300,7 +304,8 @@ function updateFromListTable(data) {
         'Authored date',
         'Committed date',
         'Upstream PR / Guessed upstream SHA',
-        'Author'];
+        'Author',
+        'Author Email'];
     const template = [
         (item) => item.title,
         (item) => shaToLink(data.meta.downstream_url, item.sha),
@@ -317,7 +322,8 @@ function updateFromListTable(data) {
                 return upstream_sha_guess;
             }
         },
-        (item) => item.author
+        (item) => item.author,
+        (item) => item.author_email,
     ];
 
     if (show_reverts_selected()) {
@@ -340,14 +346,16 @@ function updateFromTreeTable(data) {
         'Upstream SHA',
         'Authored date',
         'Committed date',
-        'Author'];
+        'Author',
+        'Author Email'];
     const template = [
         (item) => item.title,
         (item) => shaToLink(data.meta.downstream_url, item.sha),
         (item) => item['upstream_sha'] ? shaToLink(data.meta.upstream_url, item.upstream_sha) : "",
         (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
         (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
-        (item) => item.author
+        (item) => item.author,
+        (item) => item.author_email,
     ];
 
     if (show_reverts_selected()) {
@@ -369,13 +377,15 @@ function updateNoUpTable(data) {
         'SHA',
         'Authored date',
         'Committed date',
-        'Author'];
+        'Author',
+        'Author Email'];
     const template = [
         (item) => item.title,
         (item) => shaToLink(data.meta.downstream_url, item.sha),
         (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
         (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
-        (item) => item.author
+        (item) => item.author,
+        (item) => item.author_email,
     ];
 
     if (show_reverts_selected()) {
@@ -398,14 +408,16 @@ function updateRevertedDownstreamTable(data) {
         'Reverted by',
         'Authored date',
         'Committed date',
-        'Author'];
+        'Author',
+        'Author Email'];
     const template = [
         (item) => item.title,
         (item) => shaToLink(data.meta.downstream_url, item.sha),
         (item) => shaToLink(data.meta.downstream_url, item.reverted_by_sha),
         (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
         (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
-        (item) => item.author
+        (item) => item.author,
+        (item) => item.author_email,
     ];
 
     updateTable(table, headerRow, template,
