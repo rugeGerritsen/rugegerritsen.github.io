@@ -125,6 +125,7 @@ class CommitRepr:
                 'authored_seconds_since_epoch': self._commit.authored_date,
                 'committed_seconds_since_epoch': self._commit.committed_date,
                 'author': self._commit.author.name,
+                'author_email': self._commit.author.email,
                 'title': self._commit.summary
             }
         if self._upstream_pr:
