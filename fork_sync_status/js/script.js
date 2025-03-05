@@ -66,11 +66,22 @@ function filterColumn(table_id, input, column, summary_lbl) {
     let visibleCount = 0;
     for (let i = 2; i < newTable.rows.length; i++) {
         const row = newTable.rows[i]; // Access each row
-        const cell_value = row.cells[column].innerText;
+
+        let viewItem = true;
+
+        for (let j = 0; j < newTable.rows[0].cells.length; j++) {
+            regex = new RegExp('^' + table.rows[1].cells[j].children[0].value + '$');
+            const cell_value = row.cells[j].innerText;
+
+            if (!cell_value.match(regex)) {
+                viewItem = false;
+                break;
+            }
+        }
 
         totalCount++;
 
-        if (cell_value.match(regex)) {
+        if (viewItem) {
             visibleCount++;
             row.style.display = "table-row";
         } else {
@@ -82,10 +93,6 @@ function filterColumn(table_id, input, column, summary_lbl) {
     for (let i = 0; i < newTable.rows[1].cells.length; i++) {
         var cell = newTable.rows[1].cells[i];
         const input = cell.children[0];
-
-        if (i != column) {
-            input.value = '.*';
-        }
 
         /* Add listener for the filter key. */
         input.addEventListener('input', () => {
@@ -172,9 +179,9 @@ function updateTable(table, headerRow, template, commits, summary_lbl) {
             value = url_params.get('f' + index.toString());
             if (value && value != '.*') {
                 headerRowData.children[index].children[0].value = value;
-                headerRowData.children[index].children[0].dispatchEvent(new Event('input', {bubbles: true}));
             }
         }
+        headerRowData.children[0].children[0].dispatchEvent(new Event('input', {bubbles: true}));
     }
 }
 
