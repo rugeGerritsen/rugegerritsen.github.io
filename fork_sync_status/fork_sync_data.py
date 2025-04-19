@@ -33,7 +33,8 @@ class CommitRepr:
                  commit: git.Commit,
                  parse_message_for_upstream_info=False,
                  downstream_sha = None,
-                 downstream_sha_guess = None):
+                 downstream_sha_guess = None,
+                 supports_clean_cherry_pick = None):
         self._commit = commit
         self._upstream_sha = None
         self._upstream_pr = None
@@ -42,6 +43,7 @@ class CommitRepr:
         self._upstream_sha_guess = None
         self._reverts_sha = None
         self._reverted_by_sha = None
+        self._supports_clean_cherry_pick = supports_clean_cherry_pick
 
         if parse_message_for_upstream_info:
             self._set_upstream_pr_or_sha()
@@ -94,7 +96,7 @@ class CommitRepr:
     def downstream_sha_guess(self) -> str:
         """Returns the downstream SHA for a commit that was
         cherry-picked from the PR before it was merged.
-        
+
         Note: It is not necessarily true that those two commits match.
         """
         return self._downstream_sha_guess
@@ -142,6 +144,8 @@ class CommitRepr:
             representation['reverts_sha'] = self._reverts_sha
         if self._reverted_by_sha:
             representation['reverted_by_sha'] = self._reverted_by_sha
+        if self._supports_clean_cherry_pick:
+            representation['supports_clean_cherry_pick'] = self._supports_clean_cherry_pick
 
         return representation
 
@@ -157,7 +161,7 @@ class CommitRepr:
         if search_result:
             search_result_dict = search_result.groupdict()
             self._upstream_sha = search_result_dict.get('upstream_sha', None)
-            
+
             upstream_pr = search_result_dict.get('upstream_pr', None)
             if upstream_pr:
                 if isinstance(upstream_pr, int):
@@ -213,16 +217,44 @@ def repo_add_remote(repo: git.Repo,
 
     return repo
 
-def get_fork_sync_data(upstream_commits: typing.Iterator[git.Commit],
+def test_cherry_pickable(repo : git.Repo, base_commit : git.Commit, commit : git.Commit):
+    """Checks if the commit can be cherry-picked on top of the base commit
+
+    Args:
+        repo (git.Repo): The git repo
+        base_commit (_type_): The base commit
+        commit (git.Commit): The commit to be cherry-picked
+
+    Returns:
+        bool: True if the commit can be cherry-picked without conflicts
+    """
+    status = repo.git.merge_tree(base_commit, commit, commit.parents[0])
+
+    # TODO: Use a newer git version reports the status on the first line
+    if status.startswith('changed in') or \
+        status.startswith('added in') or \
+        status.startswith('removed in') or \
+        status.startswith('merged'):
+        return False
+    elif status == '':
+        return True
+    else:
+        assert False, status
+
+def get_fork_sync_data(repo : git.Repo,
+                       base_commit : git.Commit,
+                       upstream_commits: typing.Iterator[git.Commit],
                        downstream_commits: typing.Iterator[git.Commit]) -> dict:
     """Obtain synchronization info for upstream and downstream commits
-    
+
     The returned synchronization info is represented as a dictionary
     containing the CommitRepr.do_dict() representation of all the
     upstream and downstream commits. These commits have been annotated
     with their <optional> upstream/downstream shas or PRs.
-    
+
     Args:
+        repo: The git repository
+        base_commit: The base commit of the downstream repo,
         upstream_commits: Upstream commits
         downstream_commits Downstream commits
 
@@ -269,10 +301,17 @@ def get_fork_sync_data(upstream_commits: typing.Iterator[git.Commit],
             downstream_picked_from_pr.upstream_sha_guess = str(commit)
             downstream_sha_picked_from_pr = downstream_picked_from_pr.sha
 
+        clean_cherry_pick = None
+        if not (downstream_sha_picked_from_pr or downstream_sha):
+            clean_cherry_pick = test_cherry_pickable(repo, base_commit, commit)
+
         item = CommitRepr(commit,
                           downstream_sha=downstream_sha,
-                          downstream_sha_guess=downstream_sha_picked_from_pr)
-        data['upstream_commits'].append(item.to_dict())
+                          downstream_sha_guess=downstream_sha_picked_from_pr,
+                          supports_clean_cherry_pick=clean_cherry_pick)
+        item_as_dict = item.to_dict()
+
+        data['upstream_commits'].append(item_as_dict)
 
     for item in temp_downstream_item_list:
         data['downstream_commits'].append(item.to_dict())
@@ -347,8 +386,12 @@ def main():
     downstream_commits = repo.iter_commits(
         f'{merge_base}..{args.downstream_remote}/{args.downstream_rev}')
 
+    repo.index.reset(f'{args.downstream_remote}/{args.downstream_rev}')
+
     output_data.update(
-        get_fork_sync_data(upstream_commits=upstream_commits,
+        get_fork_sync_data(repo=repo,
+                           base_commit=merge_base,
+                           upstream_commits=upstream_commits,
                            downstream_commits=downstream_commits))
 
     args.output_file.write(json.dumps(output_data))

@@ -230,6 +230,10 @@ function updateDataSourceTable(data) {
         {
             title: "Number of commits upstream only",
             val: data.upstream_commits.filter(entry => !(entry.downstream_sha || entry.downstream_sha_guess)).length
+        },
+        {
+            title: "Number of commits which can be cherry-picked cleanly",
+            val: data.upstream_commits.filter(entry => entry.supports_clean_cherry_pick).length
         }
     ];
 
@@ -285,13 +289,15 @@ function updateUpstreamOnlyTable(data) {
         'SHA',
         'Authored date',
         'Committed date',
+        'Supports clean cherry-pick',
         'Author',
-        'Author Email'];
+        'Author Email',];
     const template = [
         (item) => item.title,
         (item) => shaToLink(data.meta.upstream_url, item.sha),
         (item) => utcSecondsToDate(item.authored_seconds_since_epoch),
         (item) => utcSecondsToDate(item.committed_seconds_since_epoch),
+        (item) => item.supports_clean_cherry_pick ? '<b style="color:green">Yes</b' : '<b style="color:red">No</b',
         (item) => item.author,
         (item) => item.author_email,
     ];
